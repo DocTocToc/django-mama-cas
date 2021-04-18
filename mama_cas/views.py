@@ -83,12 +83,35 @@ class LoginView(CsrfProtectMixin, NeverCacheMixin, FormView):
         renew = to_bool(request.GET.get('renew'))
         gateway = to_bool(request.GET.get('gateway'))
 
+        if service:
+            request.session['service'] = service
+        else:
+            try:
+                service = request.session['service']
+            except KeyError:
+                pass
+        if renew:
+            request.session['renew'] = True
+        else:
+            try:
+                renew = request.session['renew']
+            except KeyError:
+                pass
+        if gateway:
+            request.session['gateway'] = gateway
+        else:
+            try:
+                gateway = request.session['gateway']
+            except KeyError:
+                pass
+
         if renew:
             logger.debug("Renew request received by credential requestor")
         elif gateway and service:
             logger.debug("Gateway request received by credential requestor")
             if request.user.is_authenticated:
                 st = ServiceTicket.objects.create_ticket(service=service, user=request.user)
+                self.clear_session()
                 if self.warn_user():
                     return redirect('cas_warn', params={'service': service, 'ticket': st.ticket})
                 return redirect(service, params={'ticket': st.ticket})
@@ -98,12 +121,14 @@ class LoginView(CsrfProtectMixin, NeverCacheMixin, FormView):
             if service:
                 logger.debug("Service ticket request received by credential requestor")
                 st = ServiceTicket.objects.create_ticket(service=service, user=request.user)
+                self.clear_session()
                 if self.warn_user():
                     return redirect('cas_warn', params={'service': service, 'ticket': st.ticket})
                 return redirect(service, params={'ticket': st.ticket})
             else:
                 msg = _("You are logged in as %s") % request.user
                 messages.success(request, msg)
+                self.clear_session()
         return super(LoginView, self).get(request, *args, **kwargs)
 
     def warn_user(self):
@@ -147,6 +172,23 @@ class LoginView(CsrfProtectMixin, NeverCacheMixin, FormView):
             st = ServiceTicket.objects.create_ticket(service=service, user=self.request.user, primary=True)
             return redirect(service, params={'ticket': st.ticket})
         return redirect('cas_login')
+
+"""
+    def get_context_data(self, **kwargs):
+        context = super(LoginView, self).get_context_data(**kwargs)
+        backend = settings.MAMA_CAS_SOCIAL_AUTH_BACKEND
+        if backend:
+            social_auth_login = reverse('social:begin', kwargs={'backend': backend})
+            context['social_auth_login'] = f"{social_auth_login}?next={reverse('cas_login')}"
+        return context
+"""
+
+    def clear_session(self):
+        for key in ['service', 'renew', 'gateway']:
+            try:
+                del self.request.session[key]
+            except KeyError:
+                pass
 
 
 class WarnView(NeverCacheMixin, LoginRequiredMixin, TemplateView):
