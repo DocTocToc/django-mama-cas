@@ -173,16 +173,6 @@ class LoginView(CsrfProtectMixin, NeverCacheMixin, FormView):
             return redirect(service, params={'ticket': st.ticket})
         return redirect('cas_login')
 
-"""
-    def get_context_data(self, **kwargs):
-        context = super(LoginView, self).get_context_data(**kwargs)
-        backend = settings.MAMA_CAS_SOCIAL_AUTH_BACKEND
-        if backend:
-            social_auth_login = reverse('social:begin', kwargs={'backend': backend})
-            context['social_auth_login'] = f"{social_auth_login}?next={reverse('cas_login')}"
-        return context
-"""
-
     def clear_session(self):
         for key in ['service', 'renew', 'gateway']:
             try:
